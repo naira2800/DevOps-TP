@@ -62,6 +62,3 @@ USER nodeuser
 CMD ["node", "server.js"]
 
 
-
-
-
