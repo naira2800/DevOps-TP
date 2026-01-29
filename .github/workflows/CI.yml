@@ -74,8 +74,8 @@ jobs:
     name: Docker build & push
     needs: test
     runs-on: ubuntu-latest
-    # Solo cuando el evento es push directo a master (no PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Solo cuando el evento es push directo a main (no PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
