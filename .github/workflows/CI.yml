@@ -133,3 +133,4 @@ jobs:
           echo "Disparando Deploy Hook para actualizar Render..."
           # Usamos el Hook secreto que fuerza el deploy de la imagen 'latest' (o la que acabamos de subir)
           curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          
