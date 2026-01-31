@@ -115,6 +115,7 @@ jobs:
           cache-to: type=inline
           # --- CAMBIO IMPORTANTE: Inyectamos la versión para Sentry ---
           build-args: |
+            SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             RELEASE_VERSION=${{ github.sha }}
           # ------------------------------------------------------------
           outputs: "type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node,tag={{rev}},push=true" 
