@@ -60,3 +60,4 @@ USER nodeuser
 
 # Comando de inicio
 CMD ["node", "server.js"]
+#prueba
