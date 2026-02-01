@@ -2,52 +2,47 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# Toolchain para módulos nativos (ej. better-sqlite3)
+# Toolchain para módulos nativos
 RUN apk add --no-cache python3 make g++ curl
 
-# Copiamos package.json e instalamos dependencias
 COPY package*.json ./
 
-# Instalamos todas las dependencias dentro del contenedor
-# RUN npm install @sentry/node @sentry/tracing && npm ci
+# Instalamos dependencias (Sentry ya viene incluido en tu package.json)
 RUN npm ci --only=production
 
-# Copiamos el resto del código
 COPY . .
 
 # -------- Imagen final --------
 FROM node:22-alpine AS prod
 WORKDIR /app
 
-# Crear usuario no root y grupo (lo haces bien)
+# Crear usuario no root y grupo
 RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs
 
-# Copiamos node_modules y app compilada desde build
+# Copiamos todo desde la etapa de build
 COPY --from=build /app /app
 
 # --------------------------------------------------
-# 🔑 CORRECCIÓN DE PERMISOS PARA ESCRITURA DE LOGS
+# 🔑 PERMISOS Y CARPETAS
 # --------------------------------------------------
-  # 1. Crear la carpeta /app/logs y data.
-  RUN mkdir -p /app/logs /data \
-# 2. Asignamos la propiedad de ambas carpetas al usuario 'nodeuser'
-# Esto resuelve el error EACCES para /app/logs y el error "No such file" para /data
+RUN mkdir -p /app/logs /data \
     && chown -R nodeuser:nodejs /app/logs /data \
-# 3. Este chmod ahora solo se aplica a /data (ya que fue creado en la línea anterior)
     && chmod 700 /data
 
-# 4.Variables de entorno
+# --------------------------------------------------
+# 🌐 VARIABLES DE ENTORNO Y SENTRY
+# --------------------------------------------------
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DB_URL=/data/data.sqlite
 
+# 1. Declaramos los argumentos que vienen de GitHub Actions
 ARG SENTRY_DSN
 ARG RELEASE_VERSION
-ENV SENTRY_RELEASE=${RELEASE_VERSION}
 
-# Si también quieres pasar el DSN por aquí (recomendado):
-# ARG SENTRY_DSN
-# ENV SENTRY_DSN=${SENTRY_DSN}
+# 2. Los convertimos en ENV para que Node.js pueda leerlos
+ENV SENTRY_DSN=${SENTRY_DSN}
+ENV SENTRY_RELEASE=${RELEASE_VERSION}
 
 # Puerto
 EXPOSE 3000
@@ -57,11 +52,8 @@ RUN apk add --no-cache curl
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:${PORT}/items || exit 1
 
-
-# Cambiar a usuario no root después de preparar todo
-# IMPORTANTE: Cambiamos de USER node a USER nodeuser para que use el usuario que tiene permisos en /app/logs
+# Cambiar a usuario no root
 USER nodeuser
 
 # Comando de inicio
 CMD ["node", "server.js"]
-#que funcione
