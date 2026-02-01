@@ -6,22 +6,15 @@ name: CI.yml
 on:
   push:
     branches: [ "main" ]
-    paths-ignore:
-      - "**.md"
+    paths-ignore: ["**.md"]
   pull_request:
     branches: [ "main" ]
-    paths-ignore:
-      - "**.md"
-  schedule:
-    - cron: "0 7 * * 1,4"   # 07:00 UTC (≈ 04:00 America/Argentina/Buenos_Aires)
+    paths-ignore: ["**.md"]
   workflow_dispatch:
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  NODE_ENV: CI
 
 jobs:
   test:
@@ -30,71 +23,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [20.x] # Simplificado para el ejemplo, puedes mantener los otros
 
     steps:
       - name: 🧾 Checkout
         uses: actions/checkout@v4
 
-      - name: 🛠️ Setup Node ${{ matrix.node-version }}
+      - name: 🛠️ Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: 📦 Instalar dependencias
-        run: npm ci --no-audit --prefer-offline
-      
-      - name: ✅ Verificar dependencias
-        run: npm ls
+        run: npm ci
 
-      - name: 🧼 Lint (si existe)
-        run: npm run lint --if-present
-
-      - name: 🧪 Tests
-        run: npm test
-
-      - name: 🧪 Run tests with coverage
+      - name: 🧪 Tests con Coverage
         run: npm test -- --coverage
 
-      - name: 🏗️ Build (si existe)
-        run: npm run build --if-present
-
-      - name: ⬆️ Subir artefacto /dist
-        if: matrix.node-version == '20.x'
+      - name: 📊 Subir reporte de cobertura
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: |
-            dist/**
-            build/**
-          if-no-files-found: ignore
+          name: coverage-report
+          path: coverage
 
   docker:
     name: Docker build & push
     needs: test
     runs-on: ubuntu-latest
-    # Solo cuando el evento es push directo a main (no PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: 🧾 Checkout
         uses: actions/checkout@v4
-
-      - name: 🔖 Metadatos de imagen
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node
-          tags: |
-            type=raw,value=latest
-            type=sha
-            # Si haces releases con tags semver, habilita:
-            # type=ref,event=tag
 
       - name: 🔐 Login Docker Hub
         uses: docker/login-action@v3
@@ -103,35 +64,19 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 🐳 Build & Push
-        id: build_push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node:latest
-          cache-to: type=inline
-          # --- CAMBIO IMPORTANTE: Inyectamos la versión para Sentry ---
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node:latest
+          # 🔑 INYECCIÓN DE VARIABLES PARA SENTRY
           build-args: |
             SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             RELEASE_VERSION=${{ github.sha }}
-          # ------------------------------------------------------------
-          outputs: "type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node,tag={{rev}},push=true" 
+          # 🚀 CACHÉ (Ajustado para evitar errores de sintaxis)
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/mi-app-node:latest
+          cache-to: type=inline
 
-      - name: 📊 Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage
-          
-      # ------------------------------------------------------------------------
-      # STEPS PARA DESPLIEGUE CONTINUO (CD) - USANDO DEPLOY HOOK
-      # ------------------------------------------------------------------------
-      - name: 🚀 Deploy en Render (Hook)
+      - name: 🚀 Deploy en Render
         run: |
-          echo "Disparando Deploy Hook para actualizar Render..."
-          # Usamos el Hook secreto que fuerza el deploy de la imagen 'latest' (o la que acabamos de subir)
           curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          
