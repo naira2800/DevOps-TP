@@ -42,8 +42,12 @@ ENV PORT=3000
 ENV DB_URL=/data/data.sqlite
 
 ARG SENTRY_DSN
+ARG RELEASE_VERSION
 ENV SENTRY_RELEASE=${RELEASE_VERSION}
 
+# Si también quieres pasar el DSN por aquí (recomendado):
+# ARG SENTRY_DSN
+# ENV SENTRY_DSN=${SENTRY_DSN}
 
 # Puerto
 EXPOSE 3000
